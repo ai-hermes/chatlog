@@ -1,4 +1,7 @@
 #!/bin/bash
+# Summary: Build and package chatlog binaries.
+# Details: 交叉编译可执行文件并打包为 zip/tar.gz，生成 `packages/` 下的发布产物与 sha256 校验文件；
+# 支持 `-v` 开启详细输出，便于 CI/CD 或本地发布流程。
 
 set -eu
 set -o pipefail

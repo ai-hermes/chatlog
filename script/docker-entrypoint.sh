@@ -1,4 +1,7 @@
 #!/bin/sh
+# Summary: Docker entrypoint for container runtime.
+# Details: 以非 root 身份运行主进程（通过 PUID/PGID 切换），
+# 并在容器启动时调整必要目录权限；保持 `set -eu` 失败即退出，确保行为可预期。
 set -eu
 
 [ -n "${UMASK:-}" ] && umask "$UMASK"
