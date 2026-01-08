@@ -114,7 +114,7 @@ dockers:
 
   - image_templates:
       - "ghcr.io/ai-hermes/chatlog:{{ .Tag }}-arm64"
-      - "ai-hermes/chatlog:{{ .Tag }}-arm64"
+      # - "ai-hermes/chatlog:{{ .Tag }}-arm64"
     dockerfile: Dockerfile
     extra_files:
       - script/docker-entrypoint.sh
