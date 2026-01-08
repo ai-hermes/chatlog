@@ -65,6 +65,8 @@ TAG_LEVEL ?= patch
 
 tag:
 	@[ -n "$(TAG)" ] || (echo "TAG is required: make tag TAG=v1.0.0 [MSG=...]" >&2; exit 1)
+	@branch=$$(git rev-parse --abbrev-ref HEAD); \
+	[ "$$branch" = "main" ] || (echo "tag can only be created on main (current: $$branch)" >&2; exit 1)
 	@echo "🏷️ Creating annotated tag $(TAG)..."
 	git tag -a "$(TAG)" -m "$(if $(MSG),$(MSG),release $(TAG))"
 
@@ -86,7 +88,9 @@ tag-delete:
 	git push "$(REMOTE)" ":refs/tags/$(TAG)"
 
 tag-auto:
-	@latest=$$(git tag --list '$(TAG_PREFIX)[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1); \
+	@branch=$$(git rev-parse --abbrev-ref HEAD); \
+	[ "$$branch" = "main" ] || (echo "tag can only be created on main (current: $$branch)" >&2; exit 1); \
+	latest=$$(git tag --list '$(TAG_PREFIX)[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1); \
 	[ -n "$$latest" ] || latest='$(TAG_PREFIX)0.0.0'; \
 	ver=$${latest#'$(TAG_PREFIX)'}; \
 	set -- $$(echo "$$ver" | tr '.' ' '); \
