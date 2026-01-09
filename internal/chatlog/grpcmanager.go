@@ -477,3 +477,30 @@ func (m *GRPCManager) GetKey(configPath string, pid int, force bool, showXorKey 
 	}
 	return nil, fmt.Errorf("wechat process not found")
 }
+
+func (m *GRPCManager) Decrypt(configPath string, cmdConf map[string]any) error {
+
+	var err error
+	m.sc, m.scm, err = conf.LoadServiceConfig(configPath, cmdConf)
+	if err != nil {
+		return err
+	}
+
+	dataDir := m.sc.GetDataDir()
+	if len(dataDir) == 0 {
+		return fmt.Errorf("dataDir is required")
+	}
+
+	dataKey := m.sc.GetDataKey()
+	if len(dataKey) == 0 {
+		return fmt.Errorf("dataKey is required")
+	}
+
+	m.wechat = wechat.NewService(m.sc)
+
+	if err := m.wechat.DecryptDBFiles(); err != nil {
+		return err
+	}
+
+	return nil
+}
