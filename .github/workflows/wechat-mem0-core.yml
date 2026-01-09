@@ -34,18 +34,12 @@ jobs:
           - runs_on: ubuntu-latest
             goos: linux
             goarch: amd64
-          - runs_on: ubuntu-latest
-            goos: linux
-            goarch: arm64
           - runs_on: windows-latest
             goos: windows
             goarch: amd64
           - runs_on: macos-latest
             goos: darwin
             goarch: arm64
-          - runs_on: macos-latest
-            goos: darwin
-            goarch: amd64
 
     steps:
       - name: Checkout
