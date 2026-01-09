@@ -17,6 +17,8 @@ type Manager interface {
 	CommandDecrypt(configPath string, cmdConf map[string]any) error
 	CommandHTTPServer(configPath string, cmdConf map[string]any) error
 	GetWeChatInstances() []*iwechat.Account
+
+	GetKey(configPath string, pid int, force bool, showXorKey bool) (*KeyData, error)
 }
 
 type MangerType int
