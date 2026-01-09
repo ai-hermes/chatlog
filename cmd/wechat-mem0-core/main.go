@@ -4,12 +4,15 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/rs/zerolog/log"
 	"github.com/sjzar/chatlog/internal/chatlog"
+	"github.com/sjzar/chatlog/internal/wechatdb"
 	"os"
+	"strconv"
 )
 
 func main() {
 	// debug 场景没法突破内存限制，用单独的命令行可以解析出来
 	m := chatlog.New(chatlog.ManagerTypeGRPC)
+	m = m
 	/*
 		keyData, err := m.GetKey("", 0, false, false)
 		if err != nil {
@@ -34,24 +37,55 @@ func main() {
 			fmt.Println(instance)
 		}
 	*/
-	cmdConf := make(map[string]any)
-	cmdConf["platform"] = os.Getenv("PLATFORM")
-	cmdConf["version"] = os.Getenv("VERSION")
-	cmdConf["img_key"] = os.Getenv("IMG_KEY")
-	cmdConf["data_key"] = os.Getenv("DATA_KEY")
-	cmdConf["data_dir"] = os.Getenv("DATA_DIR")
-	cmdConf["work_dir"] = os.Getenv("WORK_DIR")
-	err := m.Decrypt("", cmdConf)
-	if err != nil {
-		log.Err(err).Msg("failed to decrypt")
-		return
-	}
-	log.Info().Msg("decrypt success")
+	/*
+		cmdConf := make(map[string]any)
+		cmdConf["platform"] = os.Getenv("PLATFORM")
+		cmdConf["version"] = os.Getenv("VERSION")
+		cmdConf["img_key"] = os.Getenv("IMG_KEY")
+		cmdConf["data_key"] = os.Getenv("DATA_KEY")
+		cmdConf["data_dir"] = os.Getenv("DATA_DIR")
+		cmdConf["work_dir"] = os.Getenv("WORK_DIR")
+		err := m.Decrypt("", cmdConf)
+		if err != nil {
+			log.Err(err).Msg("failed to decrypt")
+			return
+		}
+		log.Info().Msg("decrypt success")
+	*/
 
-	//ret, err := m.CommandKeyForGRPC("", 0, false, false)
+	// db exporter
+	//ddl, err := pgmigrate.GenerateDDL(os.Getenv("DB_PATH"))
 	//if err != nil {
-	//	log.Err(err).Msg("failed to get key")
+	//	log.Err(err).Msg("failed to generate ddl")
 	//	return
 	//}
-	//fmt.Println(ret)
+	//log.Info().Str("ddl", ddl).Msg("generated ddl")
+
+	workDir := os.Getenv("WORK_DIR")
+	platform := os.Getenv("PLATFORM")
+	version, _ := strconv.Atoi(os.Getenv("VERSION"))
+	db, err := wechatdb.New(workDir, platform, version)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create db")
+		return
+	}
+	contacts, err := db.GetContacts("", 0, 0)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to get contacts")
+		return
+	}
+	//log.Info().Interface("contacts", contacts).Msg("get contacts")
+	for _, contact := range contacts.Items {
+		log.Info().Interface("contact", contact).Msg("contact")
+	}
+
+	//dbFiles, err := pgmigrate.ListDBFiles(os.Getenv("DB_PATH"))
+	//if err != nil {
+	//	log.Err(err).Msg("failed to list db files")
+	//	return
+	//}
+	//
+	//for _, dbFile := range dbFiles {
+	//	log.Info().Str("file", dbFile).Msg("loading db file")
+	//}
 }
