@@ -25,7 +25,7 @@ var keyCmd = &cobra.Command{
 	Use:   "key",
 	Short: "key",
 	Run: func(cmd *cobra.Command, args []string) {
-		m := chatlog.New()
+		m := chatlog.New(chatlog.ManagerTypeCli)
 		ret, err := m.CommandKey("", keyPID, keyForce, keyShowXorKey)
 		if err != nil {
 			log.Err(err).Msg("failed to get key")

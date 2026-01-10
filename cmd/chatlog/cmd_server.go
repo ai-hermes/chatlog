@@ -40,7 +40,7 @@ var serverCmd = &cobra.Command{
 		cmdConf := getServerConfig()
 		log.Info().Msgf("server cmd config: %+v", cmdConf)
 
-		m := chatlog.New()
+		m := chatlog.New(chatlog.ManagerTypeCli)
 		if err := m.CommandHTTPServer("", cmdConf); err != nil {
 			log.Err(err).Msg("failed to start server")
 			return
