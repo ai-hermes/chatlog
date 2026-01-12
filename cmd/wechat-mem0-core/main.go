@@ -1,14 +1,21 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
-	_ "github.com/joho/godotenv/autoload"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/sjzar/chatlog/internal/chatlog"
+	"github.com/sjzar/chatlog/internal/wechatdb"
+
+	"database/sql"
+
+	_ "github.com/joho/godotenv/autoload"
 )
 
 func initLog(debug bool, miscDir string) {
@@ -19,17 +26,17 @@ func initLog(debug bool, miscDir string) {
 	}
 
 	logPath := filepath.Join(miscDir, "logs")
-logFD, err := os.OpenFile(filepath.Join(logPath, "wechat-mem0-core.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logFD, err := os.OpenFile(filepath.Join(logPath, "wechat-mem0-core.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		panic(err)
 	}
 
-log.Logger = log.Output(zerolog.MultiLevelWriter(zerolog.ConsoleWriter{Out: os.Stderr, NoColor: true, TimeFormat: time.RFC3339}, zerolog.ConsoleWriter{Out: logFD, NoColor: true, TimeFormat: time.RFC3339}))
+	log.Logger = log.Output(zerolog.MultiLevelWriter(zerolog.ConsoleWriter{Out: os.Stderr, NoColor: true, TimeFormat: time.RFC3339}, zerolog.ConsoleWriter{Out: logFD, NoColor: true, TimeFormat: time.RFC3339}))
 }
 
 func main() {
-	miscDir := os.Getenv("MISC_DIR")
-	initLog(false, miscDir)
+	//miscDir := os.Getenv("MISC_DIR")
+	//initLog(false, miscDir)
 
 	// debug 场景没法突破内存限制，用单独的命令行可以解析出来
 	m := chatlog.New(chatlog.ManagerTypeGRPC)
@@ -150,7 +157,7 @@ func main() {
 
 	/*
 		// WeChat Media file
-mediaPath := os.Getenv("IMAGE_MEDIA_FILE_PATH")
+		mediaPath := os.Getenv("IMAGE_MEDIA_FILE_PATH")
 		b, err := os.ReadFile(mediaPath)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to read file")
@@ -170,6 +177,86 @@ mediaPath := os.Getenv("IMAGE_MEDIA_FILE_PATH")
 		}
 		log.Info().Str("path", outputPath).Msg("image saved")
 	*/
+
+	workDir := os.Getenv("WORK_DIR")
+	platform := os.Getenv("PLATFORM")
+	version, _ := strconv.Atoi(os.Getenv("VERSION"))
+	db, err := wechatdb.New(workDir, platform, version)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create db")
+		return
+	}
+	contacts, err := db.GetContacts("", 0, 0)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to get contacts")
+		return
+	}
+
+	ds := os.Getenv("DATA_SOURCE")
+	pgDB, err := sql.Open("pgx", ds)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connect to postgres")
+		return
+	}
+	defer pgDB.Close()
+
+	ctx := context.Background()
+
+	_, err = pgDB.ExecContext(ctx, `
+		CREATE TABLE IF NOT EXISTS contact (
+			id SERIAL PRIMARY KEY,
+			user_name VARCHAR(255) NOT NULL,
+			alias VARCHAR(255),
+			remark VARCHAR(255),
+			nick_name VARCHAR(255),
+			is_friend BOOLEAN DEFAULT FALSE,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create table")
+		return
+	}
+
+	tx, err := pgDB.BeginTx(ctx, nil)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to begin transaction")
+		return
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO contact (user_name, alias, remark, nick_name, is_friend)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (user_name) DO UPDATE SET
+			alias = EXCLUDED.alias,
+			remark = EXCLUDED.remark,
+			nick_name = EXCLUDED.nick_name,
+			is_friend = EXCLUDED.is_friend,
+			updated_at = CURRENT_TIMESTAMP
+	`)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to prepare statement")
+		return
+	}
+	defer stmt.Close()
+
+	for _, contact := range contacts.Items {
+		log.Info().Interface("contact", contact).Msg("contact")
+		_, err := stmt.ExecContext(ctx, contact.UserName, contact.Alias, contact.Remark, contact.NickName, contact.IsFriend)
+		if err != nil {
+			log.Error().Err(err).Str("user_name", contact.UserName).Msg("failed to insert contact")
+			continue
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Fatal().Err(err).Msg("failed to commit transaction")
+		return
+	}
+
+	log.Info().Int("count", len(contacts.Items)).Msg("contacts saved to postgres")
 
 	/*
 		// db migration
