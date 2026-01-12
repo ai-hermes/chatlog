@@ -150,7 +150,7 @@ func main() {
 
 	/*
 		// WeChat Media file
-		mediaPath := os.Getenv("IMAGE_MEDIA_FILE_PATH
+mediaPath := os.Getenv("IMAGE_MEDIA_FILE_PATH")
 		b, err := os.ReadFile(mediaPath)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to read file")
