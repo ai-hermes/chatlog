@@ -19,7 +19,7 @@ func initLog(debug bool, miscDir string) {
 	}
 
 	logPath := filepath.Join(miscDir, "logs")
-	logFD, err := os.OpenFile(filepath.Join(logPath, "wechat-mem0-core.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+logFD, err := os.OpenFile(filepath.Join(logPath, "wechat-mem0-core.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		panic(err)
 	}
