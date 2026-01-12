@@ -202,39 +202,26 @@ func main() {
 
 	ctx := context.Background()
 
-	_, err = pgDB.ExecContext(ctx, `
-		CREATE TABLE IF NOT EXISTS contact (
-			id SERIAL PRIMARY KEY,
-			user_name VARCHAR(255) NOT NULL,
-			alias VARCHAR(255),
-			remark VARCHAR(255),
-			nick_name VARCHAR(255),
-			is_friend BOOLEAN DEFAULT FALSE,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create table")
-		return
-	}
+	//_, err = pgDB.ExecContext(ctx, `
+	//	CREATE TABLE IF NOT EXISTS contact (
+	//		id SERIAL PRIMARY KEY,
+	//		user_name VARCHAR(255) NOT NULL UNIQUE,
+	//		alias VARCHAR(255),
+	//		remark VARCHAR(255),
+	//		nick_name VARCHAR(255),
+	//		is_friend BOOLEAN DEFAULT FALSE,
+	//		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	//		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	//	)
+	//`)
+	//if err != nil {
+	//	log.Fatal().Err(err).Msg("failed to create table")
+	//	return
+	//}
 
-	tx, err := pgDB.BeginTx(ctx, nil)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to begin transaction")
-		return
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
+	stmt, err := pgDB.PrepareContext(ctx, `
 		INSERT INTO contact (user_name, alias, remark, nick_name, is_friend)
 		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (user_name) DO UPDATE SET
-			alias = EXCLUDED.alias,
-			remark = EXCLUDED.remark,
-			nick_name = EXCLUDED.nick_name,
-			is_friend = EXCLUDED.is_friend,
-			updated_at = CURRENT_TIMESTAMP
 	`)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to prepare statement")
@@ -242,21 +229,20 @@ func main() {
 	}
 	defer stmt.Close()
 
+	successCount := 0
+	failCount := 0
 	for _, contact := range contacts.Items {
 		log.Info().Interface("contact", contact).Msg("contact")
 		_, err := stmt.ExecContext(ctx, contact.UserName, contact.Alias, contact.Remark, contact.NickName, contact.IsFriend)
 		if err != nil {
 			log.Error().Err(err).Str("user_name", contact.UserName).Msg("failed to insert contact")
+			failCount++
 			continue
 		}
+		successCount++
 	}
 
-	if err := tx.Commit(); err != nil {
-		log.Fatal().Err(err).Msg("failed to commit transaction")
-		return
-	}
-
-	log.Info().Int("count", len(contacts.Items)).Msg("contacts saved to postgres")
+	log.Info().Ints("count", []int{successCount, failCount}).Msg("contacts saved to postgres")
 
 	/*
 		// db migration
