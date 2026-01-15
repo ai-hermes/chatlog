@@ -152,7 +152,7 @@ func (m *SQLiteMigration) ExportChatRoom() error {
 	defer tx.Rollback()
 
 	stmt, err := tx.PrepareContext(ctx, `
-				INSERT INTO chat_room (name, owner, remark, nick_name, users)
+				INSERT INTO wechat_chat_room (name, owner, remark, nick_name, users)
 				VALUES ($1, $2, $3, $4, $5)
 			`)
 	if err != nil {
@@ -185,7 +185,7 @@ func (m *SQLiteMigration) ExportChatRoom() error {
 
 func (m *SQLiteMigration) ExportMessage() error {
 	insertStmt, err := m.DB.Prepare(`
-		INSERT OR IGNORE INTO wechat_message (seq, time, talker, talker_name, is_chat_room, sender, is_self, type, sub_type, content, contents)
+		INSERT INTO wechat_message (seq, time, talker, talker_name, is_chat_room, sender, is_self, type, sub_type, content, contents)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
@@ -262,11 +262,6 @@ func (m *SQLiteMigration) ExportMessage() error {
 
 		totalMessages += len(messages)
 		log.Info().Int("count", len(messages)).Msg("messages saved to sqlite")
-
-		_, err = m.DB.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
-		if err != nil {
-			log.Warn().Err(err).Msg("failed to checkpoint WAL")
-		}
 	}
 
 	log.Info().Ints("stats", []int{len(contacts.Items), totalMessages}).Msg("import completed")
