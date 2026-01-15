@@ -1,8 +1,6 @@
 package main
 
 import (
-	"database/sql"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -193,22 +191,34 @@ func main() {
 		return
 	}
 
-	sqlitePath := "/Users/dingwenjiang/Library/Application Support/wechat-mem0/wechat-mem0-chats.db"
-	//sqliteDir := filepath.Dir(sqlitePath)
-	//if err := os.MkdirAll(sqliteDir, 0755); err != nil {
-	//	log.Fatal().Err(err).Msg("failed to create sqlite directory")
-	//	return
-	//}
-
-	sqlDB, err := sql.Open("sqlite3", sqlitePath)
+	migration, err := NewSQLiteMigration("/Users/warjiang/Library/Application Support/wechat-mem0/wechat-mem0-chats.db", db)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to open sqlite database")
+		log.Fatal().Err(err).Msg("failed to create migration")
 		return
 	}
-	defer sqlDB.Close()
+	if err = migration.Export(); err != nil {
+		log.Fatal().Err(err).Msg("failed to export migration")
+		return
+	}
+	log.Info().Msg("migration exported")
 
-	log.Info().Str("path", sqlitePath).Msg("sqlite database opened")
+	/*
+		sqlitePath := "/Users/dingwenjiang/Library/Application Support/wechat-mem0/wechat-mem0-chats.db"
+		//sqliteDir := filepath.Dir(sqlitePath)
+		//if err := os.MkdirAll(sqliteDir, 0755); err != nil {
+		//	log.Fatal().Err(err).Msg("failed to create sqlite directory")
+		//	return
+		//}
 
+		sqlDB, err := sql.Open("sqlite3", sqlitePath)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to open sqlite database")
+			return
+		}
+		defer sqlDB.Close()
+
+		log.Info().Str("path", sqlitePath).Msg("sqlite database opened")
+	*/
 	//_, err = sqlDB.Exec("CREATE INDEX IF NOT EXISTS idx_message_talker ON message(talker)")
 	//if err != nil {
 	//	log.Fatal().Err(err).Msg("failed to create talker index")
@@ -221,13 +231,14 @@ func main() {
 	//	return
 	//}
 
-	_, err = sqlDB.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
-	if err != nil {
-		log.Warn().Err(err).Msg("failed to checkpoint WAL")
-	}
+	/*
+		_, err = sqlDB.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to checkpoint WAL")
+		}
 
-	log.Info().Msg("sqlite database initialized with performance optimizations")
-
+		log.Info().Msg("sqlite database initialized with performance optimizations")
+	*/
 	/*
 		contacts, err := db.GetContacts("", 0, 0)
 		if err != nil {
@@ -293,95 +304,95 @@ func main() {
 		}
 		log.Info().Ints("count", []int{successCount, failCount}).Msg("chat rooms saved to postgres")
 	*/
-
-	contacts, err := db.GetContacts("", 0, 0)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get contacts")
-		return
-	}
-
-	insertStmt, err := sqlDB.Prepare(`
-		INSERT OR IGNORE INTO wechat_message (seq, time, talker, talker_name, is_chat_room, sender, is_self, type, sub_type, content, contents)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to prepare insert statement")
-		return
-	}
-	defer insertStmt.Close()
-
-	totalMessages := 0
-	totalContacts := 0
-
-	for _, contact := range contacts.Items {
-		totalContacts++
-		log.Info().Interface("contact", contact).Msg("contact")
-		messages, err := db.GetMessages(time.Unix(0, 0), time.Now(), contact.UserName, "", "", 0, 0)
+	/*
+		contacts, err := db.GetContacts("", 0, 0)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to get messages")
+			log.Fatal().Err(err).Msg("failed to get contacts")
 			return
 		}
 
-		if len(messages) == 0 {
-			continue
-		}
-
-		log.Info().Int("batch_size", len(messages)).Msg("batch importing messages")
-
-		tx, err := sqlDB.Begin()
+		insertStmt, err := sqlDB.Prepare(`
+			INSERT OR IGNORE INTO wechat_message (seq, time, talker, talker_name, is_chat_room, sender, is_self, type, sub_type, content, contents)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to begin transaction")
+			log.Fatal().Err(err).Msg("failed to prepare insert statement")
 			return
 		}
+		defer insertStmt.Close()
 
-		for _, message := range messages {
-			var contentsJSON string
-			if message.Contents != nil {
-				contentsBytes, err := json.Marshal(message.Contents)
+		totalMessages := 0
+		totalContacts := 0
+
+		for _, contact := range contacts.Items {
+			totalContacts++
+			log.Info().Interface("contact", contact).Msg("contact")
+			messages, err := db.GetMessages(time.Unix(0, 0), time.Now(), contact.UserName, "", "", 0, 0)
+			if err != nil {
+				log.Fatal().Err(err).Msg("failed to get messages")
+				return
+			}
+
+			if len(messages) == 0 {
+				continue
+			}
+
+			log.Info().Int("batch_size", len(messages)).Msg("batch importing messages")
+
+			tx, err := sqlDB.Begin()
+			if err != nil {
+				log.Fatal().Err(err).Msg("failed to begin transaction")
+				return
+			}
+
+			for _, message := range messages {
+				var contentsJSON string
+				if message.Contents != nil {
+					contentsBytes, err := json.Marshal(message.Contents)
+					if err != nil {
+						log.Error().Err(err).Msg("failed to marshal contents")
+						tx.Rollback()
+						return
+					}
+					contentsJSON = string(contentsBytes)
+				}
+
+				_, err := insertStmt.Exec(
+					message.Seq,
+					message.Time,
+					message.Talker,
+					message.TalkerName,
+					boolToInt64(message.IsChatRoom),
+					message.Sender,
+					boolToInt64(message.IsSelf),
+					message.Type,
+					message.SubType,
+					message.Content,
+					contentsJSON,
+				)
 				if err != nil {
-					log.Error().Err(err).Msg("failed to marshal contents")
+					log.Error().Err(err).Msg("failed to insert message")
 					tx.Rollback()
 					return
 				}
-				contentsJSON = string(contentsBytes)
 			}
 
-			_, err := insertStmt.Exec(
-				message.Seq,
-				message.Time,
-				message.Talker,
-				message.TalkerName,
-				boolToInt64(message.IsChatRoom),
-				message.Sender,
-				boolToInt64(message.IsSelf),
-				message.Type,
-				message.SubType,
-				message.Content,
-				contentsJSON,
-			)
-			if err != nil {
-				log.Error().Err(err).Msg("failed to insert message")
-				tx.Rollback()
+			if err := tx.Commit(); err != nil {
+				log.Fatal().Err(err).Msg("failed to commit transaction")
 				return
 			}
+
+			totalMessages += len(messages)
+			log.Info().Int("count", len(messages)).Msg("messages saved to sqlite")
+
+			_, err = sqlDB.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+			if err != nil {
+				log.Warn().Err(err).Msg("failed to checkpoint WAL")
+			}
 		}
 
-		if err := tx.Commit(); err != nil {
-			log.Fatal().Err(err).Msg("failed to commit transaction")
-			return
-		}
-
-		totalMessages += len(messages)
-		log.Info().Int("count", len(messages)).Msg("messages saved to sqlite")
-
-		_, err = sqlDB.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
-		if err != nil {
-			log.Warn().Err(err).Msg("failed to checkpoint WAL")
-		}
-	}
-
-	log.Info().Ints("stats", []int{totalContacts, totalMessages}).Msg("import completed")
-
+		log.Info().Ints("stats", []int{totalContacts, totalMessages}).Msg("import completed")
+	*/
 	/*
 		// db migration
 		dbFiles, err := pgmigrate.ListDBFiles(os.Getenv("DB_PATH"))
