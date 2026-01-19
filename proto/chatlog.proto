@@ -83,8 +83,13 @@ message DecryptDBFilesResponse {}
 message StartAutoDecryptRequest {}
 message StartAutoDecryptResponse {}
 
-message BackupRequest {}
-message BackupResponse {}
+message BackupRequest {
+  string db_type = 1;
+  string db_path = 2;
+}
+message BackupResponse {
+  string message = 1;
+}
 
 message StopAutoDecryptRequest {}
 message StopAutoDecryptResponse {}
