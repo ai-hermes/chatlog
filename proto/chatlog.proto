@@ -1,6 +1,6 @@
 syntax = "proto3";
 package chatlog;
-option go_package = "wechat-mem0-core/pb";
+option go_package = "github.com/sjzar/chatlog/pkg/pb";
 
 // ManagerService provides gRPC interface for WeChat operations
 service ManagerService {

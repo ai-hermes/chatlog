@@ -2,12 +2,13 @@ package main
 
 import (
 	"flag"
-	"github.com/sjzar/chatlog/pkg/grpcserver"
-	"github.com/sjzar/chatlog/pkg/logger"
-	"github.com/sjzar/chatlog/pkg/manager"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/sjzar/chatlog/internal/chatlog"
+	"github.com/sjzar/chatlog/pkg/grpcserver"
+	"github.com/sjzar/chatlog/pkg/logger"
 )
 
 func main() {
@@ -31,7 +32,8 @@ func main() {
 
 	// Create your Manager implementation here
 	// TODO: Replace StubManager with your actual implementation
-	mgr := manager.NewStubManager()
+	// mgr := manager.NewStubManager()
+	mgr := chatlog.New(chatlog.ManagerTypeGRPC)
 
 	// Create and start gRPC server
 	server := grpcserver.New(mgr)

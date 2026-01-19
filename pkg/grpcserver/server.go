@@ -4,11 +4,13 @@ package grpcserver
 import (
 	"context"
 	"fmt"
-	"github.com/sjzar/chatlog/pkg/logger"
-	"github.com/sjzar/chatlog/pkg/manager"
-	"github.com/sjzar/chatlog/pkg/pb"
 	"net"
 	"runtime/debug"
+
+	"github.com/sjzar/chatlog/internal/chatlog"
+	iwechat "github.com/sjzar/chatlog/internal/wechat"
+	"github.com/sjzar/chatlog/pkg/logger"
+	"github.com/sjzar/chatlog/pkg/pb"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -19,12 +21,12 @@ import (
 // Server implements the gRPC ManagerService.
 type Server struct {
 	pb.UnimplementedManagerServiceServer
-	manager manager.Manager
+	manager chatlog.Manager
 	server  *grpc.Server
 }
 
 // New creates a new gRPC server.
-func New(mgr manager.Manager) *Server {
+func New(mgr chatlog.Manager) *Server {
 	return &Server{
 		manager: mgr,
 	}
@@ -98,9 +100,9 @@ func (s *Server) Run(ctx context.Context, req *pb.RunRequest) (*pb.RunResponse, 
 
 // Switch switches to a different WeChat account.
 func (s *Server) Switch(ctx context.Context, req *pb.SwitchRequest) (*pb.SwitchResponse, error) {
-	var info *manager.Account
+	var info *iwechat.Account
 	if req.Info != nil {
-		info = &manager.Account{
+		info = &iwechat.Account{
 			Name:        req.Info.Name,
 			Platform:    req.Info.Platform,
 			Version:     int(req.Info.Version),
@@ -249,8 +251,8 @@ func (s *Server) GetKey(ctx context.Context, req *pb.GetKeyRequest) (*pb.GetKeyR
 
 	return &pb.GetKeyResponse{
 		Data: &pb.KeyData{
-			Key:    keyData.Key,
-			ImgKey: keyData.ImgKey,
+			Key:    keyData.DataKey,
+			ImgKey: keyData.ImageKey,
 		},
 	}, nil
 }

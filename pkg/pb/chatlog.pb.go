@@ -1706,7 +1706,7 @@ const file_proto_chatlog_proto_rawDesc = "" +
 	"\x11CommandHTTPServer\x12!.chatlog.CommandHTTPServerRequest\x1a\".chatlog.CommandHTTPServerResponse\x12]\n" +
 	"\x12GetWeChatInstances\x12\".chatlog.GetWeChatInstancesRequest\x1a#.chatlog.GetWeChatInstancesResponse\x129\n" +
 	"\x06GetKey\x12\x16.chatlog.GetKeyRequest\x1a\x17.chatlog.GetKeyResponse\x12<\n" +
-	"\aDecrypt\x12\x17.chatlog.DecryptRequest\x1a\x18.chatlog.DecryptResponseB\x15Z\x13wechat-mem0-core/pbb\x06proto3"
+	"\aDecrypt\x12\x17.chatlog.DecryptRequest\x1a\x18.chatlog.DecryptResponseB!Z\x1fgithub.com/sjzar/chatlog/pkg/pbb\x06proto3"
 
 var (
 	file_proto_chatlog_proto_rawDescOnce sync.Once
