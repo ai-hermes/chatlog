@@ -19,7 +19,7 @@ UPX_PLATFORMS := \
 	linux/arm64 \
 	windows/amd64
 
-.PHONY: all clean lint tidy test build crossbuild build-wechat-mem0-core crossbuild-wechat-mem0-core upx tag tag-push tag-and-push tag-push-all tag-delete tag-auto tag-auto-push
+.PHONY: all clean lint tidy test build crossbuild build-wechat-mem0-core crossbuild-wechat-mem0-core upx tag tag-push tag-and-push tag-push-all tag-delete tag-auto tag-auto-push proto proto-js
 
 all: clean lint tidy test build
 
@@ -131,3 +131,34 @@ tag-auto-push:
 	[ -n "$$new" ] || (echo "failed to detect TAG from tag-auto output" >&2; exit 1); \
 	echo "🚀 Pushing tag $$new to $(REMOTE)..."; \
 	git push "$(REMOTE)" "$$new"
+
+
+# Go protobuf output directory
+PB_GO_OUT = pkg/pb
+# Node.js protobuf output directory
+PB_JS_OUT = examples/client-node/src/pb
+
+# Compile protobuf files (with gRPC)
+proto:
+	@echo "Compiling protobuf with gRPC..."
+	@mkdir -p $(PB_GO_OUT)
+	protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		--go_opt=Mproto/chatlog.proto=pkg/pb \
+		--go-grpc_opt=Mproto/chatlog.proto=pkg/pb \
+		proto/chatlog.proto
+	@mv proto/chatlog.pb.go $(PB_GO_OUT)/ 2>/dev/null || true
+	@mv proto/chatlog_grpc.pb.go $(PB_GO_OUT)/ 2>/dev/null || true
+	@echo "Protobuf compilation complete."
+
+
+# Generate JavaScript/TypeScript protobuf (for Node.js client)
+proto-js:
+	@echo "Compiling protobuf for JavaScript..."
+	@mkdir -p $(PB_JS_OUT)
+	pnpm exec grpc_tools_node_protoc \
+		--js_out=import_style=commonjs,binary:$(PB_JS_OUT) \
+		--grpc_out=grpc_js:$(PB_JS_OUT) \
+		--plugin=protoc-gen-grpc=`which grpc_tools_node_protoc_plugin` \
+		proto/chatlog.proto
+	@echo "JavaScript protobuf compilation complete."
