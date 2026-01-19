@@ -145,7 +145,7 @@ func (s *Service) BackupContacts() error {
 	}
 
 	// Batch insert/upsert
-	result := s.db.Save(&contactModels)
+	result := s.db.CreateInBatches(&contactModels, 100)
 
 	if result.Error != nil {
 		return fmt.Errorf("failed to save contacts: %w", result.Error)
@@ -185,7 +185,7 @@ func (s *Service) BackupChatRooms() error {
 		return nil
 	}
 
-	result := s.db.Save(&roomModels)
+	result := s.db.CreateInBatches(&roomModels, 100)
 	if result.Error != nil {
 		return fmt.Errorf("failed to save chat rooms: %w", result.Error)
 	}

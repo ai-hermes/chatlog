@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"net"
 	"runtime/debug"
+	"strings"
 
+	"github.com/rs/zerolog/log"
 	"github.com/sjzar/chatlog/internal/chatlog"
 	iwechat "github.com/sjzar/chatlog/internal/wechat"
+	"github.com/sjzar/chatlog/internal/wechatdb"
+	"github.com/sjzar/chatlog/pkg/backup"
 	"github.com/sjzar/chatlog/pkg/logger"
 	"github.com/sjzar/chatlog/pkg/pb"
 
@@ -23,19 +27,50 @@ var _ pb.ManagerServiceServer = (*Server)(nil)
 
 type Server struct {
 	pb.UnimplementedManagerServiceServer
-	manager chatlog.Manager
-	server  *grpc.Server
+	manager  chatlog.Manager
+	server   *grpc.Server
+	wechatDB *wechatdb.DB
 }
 
 func (s *Server) Backup(ctx context.Context, request *pb.BackupRequest) (*pb.BackupResponse, error) {
 	//TODO implement me
-	panic("implement me")
+	dbPath := request.DbPath
+	if dbPath == "" {
+		return nil, status.Error(codes.InvalidArgument, "Database path is required")
+	}
+	if !strings.HasSuffix(dbPath, ".db") {
+		dbPath += ".db"
+	}
+	logger.Info().Msgf("Backup %s", dbPath)
+	backupConfig := backup.Config{
+		Driver: backup.DriverSQLite,
+		DSN:    dbPath,
+	}
+
+	// Initialize Backup Service
+	svc, err := backup.NewService(backupConfig, s.wechatDB)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to create backup service")
+		return nil, status.Error(codes.Internal, "failed to create backup service")
+	}
+
+	// Run Backup
+	if err := svc.Run(); err != nil {
+		logger.Error().Err(err).Msg("backup process failed")
+		return nil, status.Error(codes.Internal, "backup process failed")
+	}
+
+	log.Info().Msg("Backup completed successfully via GORM service")
+	return &pb.BackupResponse{
+		Message: "success",
+	}, nil
 }
 
 // New creates a new gRPC server.
-func New(mgr chatlog.Manager) *Server {
+func New(mgr chatlog.Manager, wechatDB *wechatdb.DB) *Server {
 	return &Server{
-		manager: mgr,
+		manager:  mgr,
+		wechatDB: wechatDB,
 	}
 }
 

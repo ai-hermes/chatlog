@@ -882,6 +882,8 @@ func (*StartAutoDecryptResponse) Descriptor() ([]byte, []int) {
 
 type BackupRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	DbType        string                 `protobuf:"bytes,1,opt,name=db_type,json=dbType,proto3" json:"db_type,omitempty"`
+	DbPath        string                 `protobuf:"bytes,2,opt,name=db_path,json=dbPath,proto3" json:"db_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -916,8 +918,23 @@ func (*BackupRequest) Descriptor() ([]byte, []int) {
 	return file_proto_chatlog_proto_rawDescGZIP(), []int{20}
 }
 
+func (x *BackupRequest) GetDbType() string {
+	if x != nil {
+		return x.DbType
+	}
+	return ""
+}
+
+func (x *BackupRequest) GetDbPath() string {
+	if x != nil {
+		return x.DbPath
+	}
+	return ""
+}
+
 type BackupResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -950,6 +967,13 @@ func (x *BackupResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use BackupResponse.ProtoReflect.Descriptor instead.
 func (*BackupResponse) Descriptor() ([]byte, []int) {
 	return file_proto_chatlog_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *BackupResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
 }
 
 type StopAutoDecryptRequest struct {
@@ -1708,9 +1732,12 @@ const file_proto_chatlog_proto_rawDesc = "" +
 	"\x15DecryptDBFilesRequest\"\x18\n" +
 	"\x16DecryptDBFilesResponse\"\x19\n" +
 	"\x17StartAutoDecryptRequest\"\x1a\n" +
-	"\x18StartAutoDecryptResponse\"\x0f\n" +
-	"\rBackupRequest\"\x10\n" +
-	"\x0eBackupResponse\"\x18\n" +
+	"\x18StartAutoDecryptResponse\"A\n" +
+	"\rBackupRequest\x12\x17\n" +
+	"\adb_type\x18\x01 \x01(\tR\x06dbType\x12\x17\n" +
+	"\adb_path\x18\x02 \x01(\tR\x06dbPath\"*\n" +
+	"\x0eBackupResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"\x18\n" +
 	"\x16StopAutoDecryptRequest\"\x19\n" +
 	"\x17StopAutoDecryptResponse\"\x17\n" +
 	"\x15RefreshSessionRequest\"\x18\n" +
