@@ -33,4 +33,4 @@ bin/
 .idea
 misc
 .DS_Store
-
+node_modules
