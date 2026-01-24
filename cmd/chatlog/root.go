@@ -35,7 +35,7 @@ var rootCmd = &cobra.Command{
 }
 
 func Root(cmd *cobra.Command, args []string) {
-	m := chatlog.New()
+	m := chatlog.New(chatlog.ManagerTypeCli)
 	if err := m.Run(""); err != nil {
 		log.Err(err).Msg("failed to run chatlog instance")
 	}

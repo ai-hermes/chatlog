@@ -33,7 +33,7 @@ var decryptCmd = &cobra.Command{
 
 		cmdConf := getDecryptConfig()
 
-		m := chatlog.New()
+		m := chatlog.New(chatlog.ManagerTypeCli)
 		if err := m.CommandDecrypt("", cmdConf); err != nil {
 			log.Err(err).Msg("failed to decrypt")
 			return

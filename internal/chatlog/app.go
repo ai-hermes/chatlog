@@ -26,7 +26,7 @@ type App struct {
 	*tview.Application
 
 	ctx         *ctx.Context
-	m           *Manager
+	m           Manager
 	stopRefresh chan struct{}
 
 	// page
@@ -42,7 +42,7 @@ type App struct {
 	tabCount  int
 }
 
-func NewApp(ctx *ctx.Context, m *Manager) *App {
+func NewApp(ctx *ctx.Context, m Manager) *App {
 	app := &App{
 		ctx:         ctx,
 		m:           m,
@@ -657,7 +657,7 @@ func (a *App) selectAccountSelected(i *menu.Item) {
 	subMenu := menu.NewSubMenu("切换账号")
 
 	// 添加微信进程
-	instances := a.m.wechat.GetWeChatInstances()
+	instances := a.m.GetWeChatInstances()
 	if len(instances) > 0 {
 		// 添加实例标题
 		subMenu.AddItem(&menu.Item{
