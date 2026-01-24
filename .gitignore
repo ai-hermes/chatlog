@@ -30,3 +30,6 @@ go.work.sum
 chatlog.exe# Added by goreleaser init:
 dist/
 chatlog
+.github/prompts
+openspec/changes
+openspec/specs
