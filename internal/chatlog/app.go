@@ -199,7 +199,94 @@ func (a *App) inputCapture(event *tcell.EventKey) *tcell.EventKey {
 	return event
 }
 
+// checkWeChatVersionCompatibility 检查微信版本兼容性
+// 返回：是否兼容、详细信息
+func (a *App) checkWeChatVersionCompatibility() (bool, string) {
+	instances := a.m.GetWeChatInstances()
+	if len(instances) == 0 {
+		return false, "未检测到微信进程"
+	}
+
+	instance := instances[0]
+	platform := instance.Platform
+	fullVersion := instance.FullVersion
+
+	// 解析版本号
+	var major, minor, patch, build int
+	fmt.Sscanf(fullVersion, "%d.%d.%d.%d", &major, &minor, &patch, &build)
+
+	// 版本限制
+	const (
+		WindowsMaxVersion = "4.0.3.36"  // Windows 最高版本
+		MacOSMaxVersion   = "4.0.3.80"  // macOS 最高版本
+	)
+
+	var maxVersion string
+	var compatible bool
+
+	switch platform {
+	case "windows":
+		maxVersion = WindowsMaxVersion
+		// 比较: 4.0.3.36
+		if major > 4 || (major == 4 && minor > 0) || 
+		   (major == 4 && minor == 0 && patch > 3) ||
+		   (major == 4 && minor == 0 && patch == 3 && build > 36) {
+			compatible = false
+		} else {
+			compatible = true
+		}
+	
+	case "darwin":
+		maxVersion = MacOSMaxVersion
+		// 比较: 4.0.3.80
+		if major > 4 || (major == 4 && minor > 0) ||
+		   (major == 4 && minor == 0 && patch > 3) ||
+		   (major == 4 && minor == 0 && patch == 3 && build > 80) {
+			compatible = false
+		} else {
+			compatible = true
+		}
+	
+	default:
+		return true, fmt.Sprintf("平台: %s\n版本: %s", platform, fullVersion)
+	}
+
+	if compatible {
+		return true, fmt.Sprintf("平台: %s\n版本: %s\n\n✅ 版本兼容", platform, fullVersion)
+	}
+
+	return false, fmt.Sprintf("平台: %s\n检测到版本: %s\n支持的最高版本: %s\n\n⚠️  微信版本过高，请降级", 
+		platform, fullVersion, maxVersion)
+}
+
 func (a *App) initMenu() {
+	checkVersion := &menu.Item{
+		Index:       1,
+		Name:        "检测微信版本",
+		Description: "检测当前系统的微信版本号",
+		Selected: func(i *menu.Item) {
+			modal := tview.NewModal().
+				SetText("正在检测微信版本...")
+			a.mainPages.AddPage("modal", modal, true, true)
+			a.SetFocus(modal)
+
+			go func() {
+				// 在主线程中更新UI
+				a.QueueUpdateDraw(func() {
+					_, versionInfo := a.checkWeChatVersionCompatibility()
+					modal.SetText(versionInfo)
+
+					// 添加确认按钮
+					modal.AddButtons([]string{"OK"})
+					modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+						a.mainPages.RemovePage("modal")
+					})
+					a.SetFocus(modal)
+				})
+			}()
+		},
+	}
+
 	getDataKey := &menu.Item{
 		Index:       2,
 		Name:        "获取密钥",
@@ -442,6 +529,7 @@ func (a *App) initMenu() {
 		Selected:    a.selectAccountSelected,
 	}
 
+	a.menu.AddItem(checkVersion)
 	a.menu.AddItem(getDataKey)
 	a.menu.AddItem(decryptData)
 	a.menu.AddItem(httpServer)

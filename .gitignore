@@ -29,6 +29,15 @@ go.work.sum
 
 chatlog.exe# Added by goreleaser init:
 dist/
+chatlog
+
+# spec changes
+.github/prompts
+openspec/changes
+openspec/specs
+.vscode/
+
+# IDEs and editors
 bin/
 .idea
 misc
