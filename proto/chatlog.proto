@@ -22,6 +22,7 @@ service ManagerService {
   rpc GetKey(GetKeyRequest) returns (GetKeyResponse);
   rpc Decrypt(DecryptRequest) returns (DecryptResponse);
   rpc Backup(BackupRequest) returns (BackupResponse);
+  rpc MessageCDC(MessageCDCRequest) returns (MessageCDCResponse);
 }
 
 // 日志级别控制
@@ -88,6 +89,14 @@ message BackupRequest {
   string db_path = 2;
 }
 message BackupResponse {
+  string message = 1;
+}
+
+message MessageCDCRequest {
+  string db_type = 1;
+  string db_path = 2;
+}
+message MessageCDCResponse {
   string message = 1;
 }
 

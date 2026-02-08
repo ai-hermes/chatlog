@@ -7,9 +7,16 @@ import (
 	"fmt"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/sjzar/chatlog/internal/chatlog/ctx"
 )
 
 func main() {
+	context, loadCtxErr := ctx.New("")
+	if loadCtxErr != nil {
+		panic(loadCtxErr)
+	}
+	fmt.Printf("%+v\n", context)
+
 	//syncType := "user" // user or chatroom
 	//syncUserId := "wxid_wg5luiy2hc8o22"
 

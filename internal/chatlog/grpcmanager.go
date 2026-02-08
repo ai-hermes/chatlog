@@ -33,9 +33,23 @@ type GRPCManager struct {
 	app *App
 }
 
-func (m *GRPCManager) SetContext(ctx *ctx.Context, db *database.Service, http *http.Service, wechat *wechat.Service) {
+func (m *GRPCManager) SetContext(ctx *ctx.Context, db *database.Service, http *http.Service, wechatSrv *wechat.Service) {
 	m.ctx = ctx
-	m.wechat = wechat
+	//m.wechat = wechat
+	m.wechat = wechat.NewService(ctx)
+}
+
+func (m *GRPCManager) Init() error {
+	if m.wechat != nil {
+		return nil
+	}
+	var err error
+	m.ctx, err = ctx.New("")
+	if err != nil {
+		return err
+	}
+	m.wechat = wechat.NewService(m.ctx)
+	return nil
 }
 
 var _ Manager = (*GRPCManager)(nil)
@@ -202,6 +216,9 @@ func (m *GRPCManager) DecryptDBFiles() error {
 }
 
 func (m *GRPCManager) StartAutoDecrypt() error {
+	if err := m.Init(); err != nil {
+		return err
+	}
 	if m.ctx.DataKey == "" || m.ctx.DataDir == "" {
 		return fmt.Errorf("请先获取密钥")
 	}

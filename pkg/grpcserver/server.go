@@ -66,6 +66,35 @@ func (s *Server) Backup(ctx context.Context, request *pb.BackupRequest) (*pb.Bac
 	}, nil
 }
 
+func (s *Server) MessageCDC(ctx context.Context, request *pb.MessageCDCRequest) (*pb.MessageCDCResponse, error) {
+	dbPath := request.DbPath
+	if dbPath == "" {
+		return nil, status.Error(codes.InvalidArgument, "Database path is required")
+	}
+	if !strings.HasSuffix(dbPath, ".db") {
+		dbPath += ".db"
+	}
+	logger.Info().Msgf("MessageCDC %s", dbPath)
+	backupConfig := backup.Config{
+		Driver: backup.DriverSQLite,
+		DSN:    dbPath,
+	}
+
+	// Initialize Backup Service
+	svc, err := backup.NewService(backupConfig, s.wechatDB)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to create backup service")
+		return nil, status.Error(codes.Internal, "failed to create backup service")
+	}
+	if err := svc.MessageCDC(); err != nil {
+		logger.Error().Err(err).Msg("cdc for message failed")
+		return nil, status.Error(codes.Internal, "cdc for message failed")
+	}
+	return &pb.MessageCDCResponse{
+		Message: "success",
+	}, nil
+}
+
 // New creates a new gRPC server.
 func New(mgr chatlog.Manager, wechatDB *wechatdb.DB) *Server {
 	return &Server{

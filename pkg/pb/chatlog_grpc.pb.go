@@ -37,6 +37,7 @@ const (
 	ManagerService_GetKey_FullMethodName             = "/chatlog.ManagerService/GetKey"
 	ManagerService_Decrypt_FullMethodName            = "/chatlog.ManagerService/Decrypt"
 	ManagerService_Backup_FullMethodName             = "/chatlog.ManagerService/Backup"
+	ManagerService_MessageCDC_FullMethodName         = "/chatlog.ManagerService/MessageCDC"
 )
 
 // ManagerServiceClient is the client API for ManagerService service.
@@ -63,6 +64,7 @@ type ManagerServiceClient interface {
 	GetKey(ctx context.Context, in *GetKeyRequest, opts ...grpc.CallOption) (*GetKeyResponse, error)
 	Decrypt(ctx context.Context, in *DecryptRequest, opts ...grpc.CallOption) (*DecryptResponse, error)
 	Backup(ctx context.Context, in *BackupRequest, opts ...grpc.CallOption) (*BackupResponse, error)
+	MessageCDC(ctx context.Context, in *MessageCDCRequest, opts ...grpc.CallOption) (*MessageCDCResponse, error)
 }
 
 type managerServiceClient struct {
@@ -253,6 +255,16 @@ func (c *managerServiceClient) Backup(ctx context.Context, in *BackupRequest, op
 	return out, nil
 }
 
+func (c *managerServiceClient) MessageCDC(ctx context.Context, in *MessageCDCRequest, opts ...grpc.CallOption) (*MessageCDCResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MessageCDCResponse)
+	err := c.cc.Invoke(ctx, ManagerService_MessageCDC_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ManagerServiceServer is the server API for ManagerService service.
 // All implementations must embed UnimplementedManagerServiceServer
 // for forward compatibility.
@@ -277,6 +289,7 @@ type ManagerServiceServer interface {
 	GetKey(context.Context, *GetKeyRequest) (*GetKeyResponse, error)
 	Decrypt(context.Context, *DecryptRequest) (*DecryptResponse, error)
 	Backup(context.Context, *BackupRequest) (*BackupResponse, error)
+	MessageCDC(context.Context, *MessageCDCRequest) (*MessageCDCResponse, error)
 	mustEmbedUnimplementedManagerServiceServer()
 }
 
@@ -340,6 +353,9 @@ func (UnimplementedManagerServiceServer) Decrypt(context.Context, *DecryptReques
 }
 func (UnimplementedManagerServiceServer) Backup(context.Context, *BackupRequest) (*BackupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Backup not implemented")
+}
+func (UnimplementedManagerServiceServer) MessageCDC(context.Context, *MessageCDCRequest) (*MessageCDCResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MessageCDC not implemented")
 }
 func (UnimplementedManagerServiceServer) mustEmbedUnimplementedManagerServiceServer() {}
 func (UnimplementedManagerServiceServer) testEmbeddedByValue()                        {}
@@ -686,6 +702,24 @@ func _ManagerService_Backup_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ManagerService_MessageCDC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MessageCDCRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManagerServiceServer).MessageCDC(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ManagerService_MessageCDC_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManagerServiceServer).MessageCDC(ctx, req.(*MessageCDCRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ManagerService_ServiceDesc is the grpc.ServiceDesc for ManagerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -764,6 +798,10 @@ var ManagerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Backup",
 			Handler:    _ManagerService_Backup_Handler,
+		},
+		{
+			MethodName: "MessageCDC",
+			Handler:    _ManagerService_MessageCDC_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
