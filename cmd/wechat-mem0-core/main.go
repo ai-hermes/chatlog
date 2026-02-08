@@ -18,6 +18,7 @@ func main() {
 	logLevel := flag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	workDir := flag.String("work-dir", "", "dir of wechat db")
 	platform := flag.String("platform", "", "os platform")
+	autoDecrypt := flag.Bool("auto-decrypt", false, "whether to decrypt data automatically")
 	version := flag.Int("version", 4, "version of wechat")
 	flag.Parse()
 
@@ -45,9 +46,17 @@ func main() {
 	defer db.Close()
 
 	mgr := chatlog.New(chatlog.ManagerTypeGRPC)
-
+	//mgr.StartAutoDecrypt()
 	// Create and start gRPC server
 	server := grpcserver.New(mgr, db)
+
+	if *autoDecrypt {
+		err := mgr.StartAutoDecrypt()
+		if err != nil {
+			logger.Error().Msg("failed to start auto-decrypt process")
+		}
+		defer mgr.StopAutoDecrypt()
+	}
 
 	// Handle graceful shutdown
 	go func() {

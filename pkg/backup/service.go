@@ -278,6 +278,9 @@ func (s *Service) MessageCDC() error {
 	}
 	totalMessages := 0
 	for _, session := range sessions.Items {
+		//if session.UserName != "wxid_wg5luiy2hc8o22" {
+		//	continue
+		//}
 		log.Info().Msgf("Sending message to %s", session.UserName)
 
 		syncType := "user"
@@ -291,7 +294,7 @@ func (s *Service) MessageCDC() error {
 			continue
 		}
 
-		startTime := time.Unix(lastTimestamp, 0)
+		startTime := time.Unix(0, 0) //time.Unix(lastTimestamp, 0)
 		endTime := time.Now()
 		msgs, err := s.wechatDB.GetMessages(startTime, endTime, session.UserName, "", "", 0, 0)
 		if err != nil {
