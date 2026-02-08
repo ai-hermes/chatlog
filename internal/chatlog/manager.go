@@ -1,6 +1,12 @@
 package chatlog
 
-import iwechat "github.com/sjzar/chatlog/internal/wechat"
+import (
+	"github.com/sjzar/chatlog/internal/chatlog/ctx"
+	"github.com/sjzar/chatlog/internal/chatlog/database"
+	"github.com/sjzar/chatlog/internal/chatlog/http"
+	"github.com/sjzar/chatlog/internal/chatlog/wechat"
+	iwechat "github.com/sjzar/chatlog/internal/wechat"
+)
 
 type Manager interface {
 	Run(configPath string) error
@@ -20,6 +26,7 @@ type Manager interface {
 
 	GetKey(configPath string, pid int, force bool, showXorKey bool) (*KeyData, error)
 	Decrypt(configPath string, cmdConf map[string]any) error
+	SetContext(ctx *ctx.Context, db *database.Service, http *http.Service, wechat *wechat.Service)
 }
 
 type MangerType int

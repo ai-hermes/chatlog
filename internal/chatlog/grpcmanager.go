@@ -3,6 +3,9 @@ package chatlog
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/rs/zerolog/log"
 	"github.com/sjzar/chatlog/internal/chatlog/conf"
 	"github.com/sjzar/chatlog/internal/chatlog/ctx"
@@ -13,8 +16,6 @@ import (
 	"github.com/sjzar/chatlog/pkg/config"
 	"github.com/sjzar/chatlog/pkg/util"
 	"github.com/sjzar/chatlog/pkg/util/dat2img"
-	"os"
-	"strings"
 )
 
 // GRPCManager 管理聊天日志应用
@@ -30,6 +31,11 @@ type GRPCManager struct {
 
 	// Terminal UI
 	app *App
+}
+
+func (m *GRPCManager) SetContext(ctx *ctx.Context, db *database.Service, http *http.Service, wechat *wechat.Service) {
+	m.ctx = ctx
+	m.wechat = wechat
 }
 
 var _ Manager = (*GRPCManager)(nil)
