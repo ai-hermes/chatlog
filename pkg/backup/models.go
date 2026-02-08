@@ -56,6 +56,18 @@ func (Message) TableName() string {
 	return "wechat_message"
 }
 
+type MessageSyncState struct {
+	ID            uint64    `gorm:"primaryKey;column:id;autoIncrement"`
+	SyncType      string    `gorm:"column:sync_type;size:32;index:idx_message_sync_state,unique"`
+	Target        string    `gorm:"column:target;size:256;index:idx_message_sync_state,unique"`
+	LastTimestamp int64     `gorm:"column:last_timestamp"`
+	UpdatedAt     time.Time `gorm:"column:updated_at"`
+}
+
+func (MessageSyncState) TableName() string {
+	return "wechat_message_sync_state"
+}
+
 // JSONStringList handles []string serialization to JSON
 type JSONStringList []string
 
