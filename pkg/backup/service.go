@@ -1,7 +1,11 @@
 package backup
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -60,7 +64,7 @@ func NewService(cfg Config, wechatDB *wechatdb.DB) (*Service, error) {
 	}
 
 	// AutoMigrate the schema
-	if err := db.AutoMigrate(&Contact{}, &ChatRoom{}, &Message{}); err != nil {
+	if err := db.AutoMigrate(&Contact{}, &ChatRoom{}, &Message{}, &MessageSyncState{}); err != nil {
 		return nil, fmt.Errorf("failed to migrate database schema: %w", err)
 	}
 
@@ -265,4 +269,170 @@ func (s *Service) BackupMessages() error {
 
 	log.Info().Int("total_messages", totalMessages).Msg("Messages backup completed.")
 	return nil
+}
+
+func (s *Service) MessageCDC() error {
+	sessions, err := s.wechatDB.GetSessions("", 0, 0)
+	if err != nil {
+		return fmt.Errorf("failed to get sessions for message cdc: %w", err)
+	}
+	totalMessages := 0
+	for _, session := range sessions.Items {
+		log.Info().Msgf("Sending message to %s", session.UserName)
+
+		syncType := "user"
+		if strings.Contains(session.UserName, "@chatroom") {
+			syncType = "chatroom"
+		}
+
+		lastTimestamp, err := s.getMessageSyncTimestamp(syncType, session.UserName)
+		if err != nil {
+			log.Error().Err(err).Str("contact", session.UserName).Msg("failed to get message sync timestamp")
+			continue
+		}
+
+		startTime := time.Unix(lastTimestamp, 0)
+		endTime := time.Now()
+		msgs, err := s.wechatDB.GetMessages(startTime, endTime, session.UserName, "", "", 0, 0)
+		if err != nil {
+			log.Error().Err(err).Str("contact", session.UserName).Msg("failed to get messages")
+			continue
+		}
+
+		if len(msgs) == 0 {
+			continue
+		}
+
+		messageIds, err := s.QueryTargetSeqList(syncType, session.UserName)
+		if err != nil {
+			log.Error().Err(err).Str("contact", session.UserName).Msg("failed to query target seq list")
+			continue
+		}
+		messageIdList := strings.Split(messageIds, ",")
+		messageIdMap := make(map[string]int)
+		for _, messageId := range messageIdList {
+			messageIdMap[messageId] = 1
+		}
+
+		var msgModels []Message
+		maxTimestamp := lastTimestamp
+		for _, m := range msgs {
+			messageTimestamp := m.Time.Unix()
+			if messageTimestamp > maxTimestamp {
+				maxTimestamp = messageTimestamp
+			}
+
+			if _, exist := messageIdMap[strconv.FormatInt(m.Seq, 10)]; exist {
+				continue
+			}
+
+			var contents JSONContent
+			if m.Contents != nil {
+				contents = JSONContent(m.Contents)
+			}
+
+			boolToInt := func(b bool) int {
+				if b {
+					return 1
+				}
+				return 0
+			}
+
+			msgModels = append(msgModels, Message{
+				Seq:        uint64(m.Seq),
+				Time:       m.Time,
+				Talker:     m.Talker,
+				TalkerName: m.TalkerName,
+				IsChatRoom: boolToInt(m.IsChatRoom),
+				Sender:     m.Sender,
+				IsSelf:     boolToInt(m.IsSelf),
+				Type:       int(m.Type),
+				SubType:    int(m.SubType),
+				Content:    m.Content,
+				Contents:   contents,
+			})
+		}
+
+		// Batch insert
+		if err := s.db.CreateInBatches(msgModels, 100).Error; err != nil {
+			log.Error().Err(err).Str("contact", session.UserName).Msg("failed to save batch messages")
+			continue
+		}
+
+		totalMessages += len(msgModels)
+		log.Info().Int("count", len(msgModels)).Str("contact", session.NickName).Msg("Saved messages")
+
+		if maxTimestamp > lastTimestamp {
+			if err := s.upsertMessageSyncTimestamp(syncType, session.UserName, maxTimestamp); err != nil {
+				log.Error().Err(err).Str("contact", session.UserName).Msg("failed to update message sync timestamp")
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Service) getMessageSyncTimestamp(syncType, target string) (int64, error) {
+	var state MessageSyncState
+	err := s.db.Where("sync_type = ? AND target = ?", syncType, target).First(&state).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return state.LastTimestamp, nil
+}
+
+func (s *Service) upsertMessageSyncTimestamp(syncType, target string, lastTimestamp int64) error {
+	var state MessageSyncState
+	err := s.db.Where("sync_type = ? AND target = ?", syncType, target).First(&state).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			state = MessageSyncState{
+				SyncType:      syncType,
+				Target:        target,
+				LastTimestamp: lastTimestamp,
+				UpdatedAt:     time.Now(),
+			}
+			return s.db.Create(&state).Error
+		}
+		return err
+	}
+
+	state.LastTimestamp = lastTimestamp
+	state.UpdatedAt = time.Now()
+	return s.db.Save(&state).Error
+}
+
+func (s *Service) QueryTargetSeqList(syncType string, sender string) (string, error) {
+	db, _ := s.db.DB()
+
+	query := `
+		SELECT GROUP_CONCAT(seq, ',') AS seq_list
+		FROM wechat_message
+		WHERE is_chat_room = 0
+		  AND sender = ?
+		ORDER BY seq
+	`
+	if syncType == "chatroom" {
+		query = `
+			SELECT GROUP_CONCAT(seq, ',') AS seq_list
+			FROM wechat_message
+			WHERE is_chat_room = 1
+			  AND talker= ?
+			ORDER BY seq
+		
+		`
+	}
+
+	var seqList sql.NullString
+	err := db.QueryRow(query, sender).Scan(&seqList)
+	if err != nil {
+		return "", err
+	}
+
+	if seqList.Valid {
+		return seqList.String, nil
+	}
+	return "", nil
 }
