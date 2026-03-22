@@ -2,10 +2,10 @@ package dbm
 
 import (
 	"database/sql"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	_ "github.com/mattn/go-sqlite3"
@@ -21,9 +21,15 @@ type DBManager struct {
 	id      string
 	fm      *filemonitor.FileMonitor
 	fgs     map[string]*filemonitor.FileGroup
-	dbs     map[string]*sql.DB
+	dbs     map[string]*dbCache
 	dbPaths map[string][]string
 	mutex   sync.RWMutex
+}
+
+type dbCache struct {
+	db      *sql.DB
+	size    int64
+	modTime int64
 }
 
 func NewDBManager(path string) *DBManager {
@@ -32,7 +38,7 @@ func NewDBManager(path string) *DBManager {
 		id:      filepath.Base(path),
 		fm:      filemonitor.NewFileMonitor(),
 		fgs:     make(map[string]*filemonitor.FileGroup),
-		dbs:     make(map[string]*sql.DB),
+		dbs:     make(map[string]*dbCache),
 		dbPaths: make(map[string][]string),
 	}
 }
@@ -87,38 +93,48 @@ func (d *DBManager) GetDBs(name string) ([]*sql.DB, error) {
 
 func (d *DBManager) GetDBPath(name string) ([]string, error) {
 	d.mutex.RLock()
-	dbPaths, ok := d.dbPaths[name]
+	fg, ok := d.fgs[name]
 	d.mutex.RUnlock()
 	if !ok {
-		d.mutex.RLock()
-		fg, ok := d.fgs[name]
-		d.mutex.RUnlock()
-		if !ok {
-			return nil, errors.FileGroupNotFound(name)
-		}
-		list, err := fg.List()
-		if err != nil {
-			return nil, errors.DBFileNotFound(d.path, fg.PatternStr, err)
-		}
-		if len(list) == 0 {
-			return nil, errors.DBFileNotFound(d.path, fg.PatternStr, nil)
-		}
-		dbPaths = list
-		d.mutex.Lock()
-		d.dbPaths[name] = dbPaths
-		d.mutex.Unlock()
+		return nil, errors.FileGroupNotFound(name)
 	}
-	return dbPaths, nil
+
+	list, err := fg.List()
+	if err != nil {
+		return nil, errors.DBFileNotFound(d.path, fg.PatternStr, err)
+	}
+	if len(list) == 0 {
+		return nil, errors.DBFileNotFound(d.path, fg.PatternStr, nil)
+	}
+
+	d.mutex.Lock()
+	d.dbPaths[name] = list
+	d.mutex.Unlock()
+	return list, nil
 }
 
 func (d *DBManager) OpenDB(path string) (*sql.DB, error) {
-	d.mutex.RLock()
-	db, ok := d.dbs[path]
-	d.mutex.RUnlock()
-	if ok {
-		return db, nil
+	stat, err := os.Stat(path)
+	if err != nil {
+		return nil, err
 	}
-	var err error
+	size := stat.Size()
+	modTime := stat.ModTime().UnixNano()
+
+	var old *sql.DB
+	d.mutex.RLock()
+	cache, ok := d.dbs[path]
+	d.mutex.RUnlock()
+	if ok && cache.size == size && cache.modTime == modTime {
+		return cache.db, nil
+	}
+	if ok {
+		old = cache.db
+		d.mutex.Lock()
+		delete(d.dbs, path)
+		d.mutex.Unlock()
+	}
+
 	tempPath := path
 	if runtime.GOOS == "windows" {
 		tempPath, err = filecopy.GetTempCopy(d.id, path)
@@ -127,32 +143,54 @@ func (d *DBManager) OpenDB(path string) (*sql.DB, error) {
 			return nil, err
 		}
 	}
-	db, err = sql.Open("sqlite3", tempPath)
+	db, err := sql.Open("sqlite3", tempPath)
 	if err != nil {
 		log.Err(err).Msgf("连接数据库 %s 失败", path)
 		return nil, err
 	}
+
+	if old != nil {
+		_ = old.Close()
+	}
+
 	d.mutex.Lock()
-	d.dbs[path] = db
+	d.dbs[path] = &dbCache{
+		db:      db,
+		size:    size,
+		modTime: modTime,
+	}
 	d.mutex.Unlock()
 	return db, nil
 }
 
 func (d *DBManager) Callback(event fsnotify.Event) error {
-	if !event.Op.Has(fsnotify.Create) {
+	if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) == 0 {
 		return nil
 	}
 
+	d.mutex.RLock()
+	matchedGroups := make([]string, 0)
+	for name, fg := range d.fgs {
+		if fg.Match(event.Name) {
+			matchedGroups = append(matchedGroups, name)
+		}
+	}
+	d.mutex.RUnlock()
+
+	var old *sql.DB
 	d.mutex.Lock()
-	db, ok := d.dbs[event.Name]
-	if ok {
+	if cache, ok := d.dbs[event.Name]; ok {
 		delete(d.dbs, event.Name)
-		go func(db *sql.DB) {
-			time.Sleep(time.Second * 5)
-			db.Close()
-		}(db)
+		old = cache.db
+	}
+	for _, name := range matchedGroups {
+		delete(d.dbPaths, name)
 	}
 	d.mutex.Unlock()
+
+	if old != nil {
+		_ = old.Close()
+	}
 
 	return nil
 }
@@ -166,8 +204,14 @@ func (d *DBManager) Stop() error {
 }
 
 func (d *DBManager) Close() error {
-	for _, db := range d.dbs {
-		db.Close()
+	d.mutex.RLock()
+	caches := make([]*dbCache, 0, len(d.dbs))
+	for _, cache := range d.dbs {
+		caches = append(caches, cache)
+	}
+	d.mutex.RUnlock()
+	for _, cache := range caches {
+		_ = cache.db.Close()
 	}
 	return d.fm.Stop()
 }

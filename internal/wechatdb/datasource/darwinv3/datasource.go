@@ -88,7 +88,7 @@ func New(path string) (*DataSource, error) {
 	}
 
 	ds.dbm.AddCallback(Message, func(event fsnotify.Event) error {
-		if !event.Op.Has(fsnotify.Create) {
+		if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) == 0 {
 			return nil
 		}
 		if err := ds.initMessageDbs(); err != nil {
@@ -97,7 +97,7 @@ func New(path string) (*DataSource, error) {
 		return nil
 	})
 	ds.dbm.AddCallback(ChatRoom, func(event fsnotify.Event) error {
-		if !event.Op.Has(fsnotify.Create) {
+		if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) == 0 {
 			return nil
 		}
 		if err := ds.initChatRoomDb(); err != nil {
