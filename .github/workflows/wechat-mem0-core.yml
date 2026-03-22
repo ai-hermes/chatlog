@@ -73,9 +73,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wechat-mem0-core_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: |
-            bin/wechat-mem0-core_${{ matrix.goos }}_${{ matrix.goarch }}
-            bin/wechat-mem0-core_${{ matrix.goos }}_${{ matrix.goarch }}.exe
+          path: bin/wechat-mem0-core_${{ matrix.goos }}_${{ matrix.goarch }}*
           if-no-files-found: error
           retention-days: 7
 

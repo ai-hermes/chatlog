@@ -45,15 +45,18 @@ build:
 
 crossbuild: clean
 	@echo "🌍 Building for multiple platforms..."
+	@mkdir -p bin
+	@set -e; \
 	for platform in $(PLATFORMS); do \
 		os=$$(echo $$platform | cut -d/ -f1); \
 		arch=$$(echo $$platform | cut -d/ -f2); \
 		float=$$(echo $$platform | cut -d/ -f3); \
 		output_name=bin/chatlog_$${os}_$${arch}; \
+		[ "$$os" = "windows" ] && output_name=$${output_name}.exe; \
 		[ "$$float" != "" ] && output_name=$$output_name_$$float; \
 		echo "🔨 Building for $$os/$$arch..."; \
 		echo "🔨 Building for $$output_name..."; \
-		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 GOARM=$$float $(GO) build -trimpath $(LDFLAGS) -o $$output_name main.go ; \
+		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 GOARM=$$float $(GO) build -trimpath $(LDFLAGS) -o $$output_name main.go; \
 		if [ "$(ENABLE_UPX)" = "1" ] && echo "$(UPX_PLATFORMS)" | grep -q "$$os/$$arch"; then \
 			echo "⚙️ Compressing binary $$output_name..." && upx --best $$output_name; \
 		fi; \
@@ -66,6 +69,7 @@ build-wechat-mem0-core:
 crossbuild-wechat-mem0-core:
 	@echo "🌍 Building wechat-mem0-core for multiple platforms..."
 	@mkdir -p bin
+	@set -e; \
 	for platform in $(PLATFORMS); do \
 		os=$$(echo $$platform | cut -d/ -f1); \
 		arch=$$(echo $$platform | cut -d/ -f2); \
@@ -74,7 +78,7 @@ crossbuild-wechat-mem0-core:
 			output_name=$${output_name}.exe; \
 		fi; \
 		echo "🔨 Building wechat-mem0-core for $$os/$$arch..."; \
-		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 $(GO) build -trimpath $(LDFLAGS) -o $$output_name cmd/wechat-mem0-core/main.go || echo "⚠️  Failed to build for $$os/$$arch"; \
+		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 $(GO) build -trimpath $(LDFLAGS) -o $$output_name cmd/wechat-mem0-core/main.go; \
 	done
 
 

@@ -53,9 +53,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: chatlog_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: |
-            bin/chatlog_${{ matrix.goos }}_${{ matrix.goarch }}*
-            bin/chatlog_${{ matrix.goos }}_${{ matrix.goarch }}*.exe
+          path: bin/chatlog_${{ matrix.goos }}_${{ matrix.goarch }}*
           if-no-files-found: error
           retention-days: 7
 
