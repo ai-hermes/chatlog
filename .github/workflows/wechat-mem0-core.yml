@@ -34,11 +34,8 @@ jobs:
           - runs_on: ubuntu-latest
             goos: linux
             goarch: amd64
-          - runs_on: windows-latest
-            goos: windows
-            goarch: amd64
-          - runs_on: macos-latest
-            goos: darwin
+          - runs_on: ubuntu-latest
+            goos: linux
             goarch: arm64
 
     steps:
@@ -53,17 +50,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Setup MSYS2 (Windows)
-        if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          path-type: inherit
-          update: true
-          install: >-
-            base-devel
-            mingw-w64-x86_64-toolchain
-
       - name: Set version
         id: version
         shell: bash
@@ -76,16 +62,8 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-      - name: Build binary (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Build binary (Linux)
         shell: bash
-        run: make crossbuild-wechat-mem0-core PLATFORMS="${{ matrix.goos }}/${{ matrix.goarch }}" VERSION="${{ steps.version.outputs.version }}"
-        env:
-          CGO_ENABLED: "1"
-
-      - name: Build binary (Windows)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
         run: make crossbuild-wechat-mem0-core PLATFORMS="${{ matrix.goos }}/${{ matrix.goarch }}" VERSION="${{ steps.version.outputs.version }}"
         env:
           CGO_ENABLED: "1"
