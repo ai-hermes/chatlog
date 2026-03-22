@@ -1,5 +1,9 @@
 BINARY_NAME := chatlog
 GO := go
+ARM64_CC ?= aarch64-linux-gnu-gcc
+ARM64_CXX ?= aarch64-linux-gnu-g++
+ARM64_PKG_CONFIG_PATH ?= /usr/lib/aarch64-linux-gnu/pkgconfig
+ARM64_PKG_CONFIG_LIBDIR ?= /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
 ifeq ($(VERSION),)
 	VERSION := $(shell git describe --tags --always --dirty="-dev")
 endif
@@ -56,15 +60,17 @@ crossbuild: clean
 		[ "$$float" != "" ] && output_name=$$output_name_$$float; \
 		echo "🔨 Building for $$os/$$arch..."; \
 		echo "🔨 Building for $$output_name..."; \
-		cc_env=""; cxx_env=""; \
+		cc_env=""; cxx_env=""; pkg_path_env=""; pkg_libdir_env=""; \
 		if [ "$$os/$$arch" = "linux/arm64" ]; then \
-			cc_env="$${CC:-aarch64-linux-gnu-gcc}"; \
-			cxx_env="$${CXX:-aarch64-linux-gnu-g++}"; \
+			cc_env="$(ARM64_CC)"; \
+			cxx_env="$(ARM64_CXX)"; \
+			pkg_path_env="$${PKG_CONFIG_PATH:-$(ARM64_PKG_CONFIG_PATH)}"; \
+			pkg_libdir_env="$${PKG_CONFIG_LIBDIR:-$(ARM64_PKG_CONFIG_LIBDIR)}"; \
 			command -v "$$cc_env" >/dev/null 2>&1 || { echo "missing cross-compiler: $$cc_env (required for CGO linux/arm64)"; exit 1; }; \
 			command -v "$$cxx_env" >/dev/null 2>&1 || { echo "missing cross-compiler: $$cxx_env (required for CGO linux/arm64)"; exit 1; }; \
 			echo "⚙️ Using CC=$$cc_env CXX=$$cxx_env"; \
 		fi; \
-		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 GOARM=$$float CC=$$cc_env CXX=$$cxx_env $(GO) build -trimpath $(LDFLAGS) -o $$output_name main.go; \
+		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 GOARM=$$float CC=$$cc_env CXX=$$cxx_env PKG_CONFIG_PATH=$$pkg_path_env PKG_CONFIG_LIBDIR=$$pkg_libdir_env $(GO) build -trimpath $(LDFLAGS) -o $$output_name main.go; \
 		if [ "$(ENABLE_UPX)" = "1" ] && echo "$(UPX_PLATFORMS)" | grep -q "$$os/$$arch"; then \
 			echo "⚙️ Compressing binary $$output_name..." && upx --best $$output_name; \
 		fi; \
@@ -86,15 +92,17 @@ crossbuild-wechat-mem0-core:
 			output_name=$${output_name}.exe; \
 		fi; \
 		echo "🔨 Building wechat-mem0-core for $$os/$$arch..."; \
-		cc_env=""; cxx_env=""; \
+		cc_env=""; cxx_env=""; pkg_path_env=""; pkg_libdir_env=""; \
 		if [ "$$os/$$arch" = "linux/arm64" ]; then \
-			cc_env="$${CC:-aarch64-linux-gnu-gcc}"; \
-			cxx_env="$${CXX:-aarch64-linux-gnu-g++}"; \
+			cc_env="$(ARM64_CC)"; \
+			cxx_env="$(ARM64_CXX)"; \
+			pkg_path_env="$${PKG_CONFIG_PATH:-$(ARM64_PKG_CONFIG_PATH)}"; \
+			pkg_libdir_env="$${PKG_CONFIG_LIBDIR:-$(ARM64_PKG_CONFIG_LIBDIR)}"; \
 			command -v "$$cc_env" >/dev/null 2>&1 || { echo "missing cross-compiler: $$cc_env (required for CGO linux/arm64)"; exit 1; }; \
 			command -v "$$cxx_env" >/dev/null 2>&1 || { echo "missing cross-compiler: $$cxx_env (required for CGO linux/arm64)"; exit 1; }; \
 			echo "⚙️ Using CC=$$cc_env CXX=$$cxx_env"; \
 		fi; \
-		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 CC=$$cc_env CXX=$$cxx_env $(GO) build -trimpath $(LDFLAGS) -o $$output_name cmd/wechat-mem0-core/main.go; \
+		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 CC=$$cc_env CXX=$$cxx_env PKG_CONFIG_PATH=$$pkg_path_env PKG_CONFIG_LIBDIR=$$pkg_libdir_env $(GO) build -trimpath $(LDFLAGS) -o $$output_name cmd/wechat-mem0-core/main.go; \
 	done
 
 
