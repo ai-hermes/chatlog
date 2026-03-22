@@ -99,7 +99,7 @@ func New(path string) (*DataSource, error) {
 	}
 
 	ds.dbm.AddCallback(Message, func(event fsnotify.Event) error {
-		if !event.Op.Has(fsnotify.Create) {
+		if event.Op&(fsnotify.Create|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) == 0 {
 			return nil
 		}
 		if err := ds.initMessageDbs(); err != nil {
@@ -142,49 +142,59 @@ func (ds *DataSource) initMessageDbs() error {
 		// 获取 DBInfo 表中的开始时间
 		var startTime time.Time
 
-		rows, err := db.Query("SELECT tableIndex, tableVersion, tableDesc FROM DBInfo")
+		err = dbm.RetryTransientSQLite(func() error {
+			rows, err := db.Query("SELECT tableIndex, tableVersion, tableDesc FROM DBInfo")
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+
+			for rows.Next() {
+				var tableIndex int
+				var tableVersion int64
+				var tableDesc string
+
+				if err := rows.Scan(&tableIndex, &tableVersion, &tableDesc); err != nil {
+					return err
+				}
+
+				// 查找描述为 "Start Time" 的记录
+				if strings.Contains(tableDesc, "Start Time") {
+					startTime = time.Unix(tableVersion/1000, (tableVersion%1000)*1000000)
+					break
+				}
+			}
+			return rows.Err()
+		})
 		if err != nil {
 			log.Err(err).Msgf("查询数据库 %s 的 DBInfo 表失败", filePath)
 			continue
 		}
 
-		for rows.Next() {
-			var tableIndex int
-			var tableVersion int64
-			var tableDesc string
-
-			if err := rows.Scan(&tableIndex, &tableVersion, &tableDesc); err != nil {
-				log.Err(err).Msg("扫描 DBInfo 行失败")
-				continue
-			}
-
-			// 查找描述为 "Start Time" 的记录
-			if strings.Contains(tableDesc, "Start Time") {
-				startTime = time.Unix(tableVersion/1000, (tableVersion%1000)*1000000)
-				break
-			}
-		}
-		rows.Close()
-
 		// 组织 TalkerMap
 		talkerMap := make(map[string]int)
-		rows, err = db.Query("SELECT UsrName FROM Name2ID")
+		err = dbm.RetryTransientSQLite(func() error {
+			rows, err := db.Query("SELECT UsrName FROM Name2ID")
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+
+			i := 1
+			for rows.Next() {
+				var userName string
+				if err := rows.Scan(&userName); err != nil {
+					return err
+				}
+				talkerMap[userName] = i
+				i++
+			}
+			return rows.Err()
+		})
 		if err != nil {
 			log.Err(err).Msgf("查询数据库 %s 的 Name2ID 表失败", filePath)
 			continue
 		}
-
-		i := 1
-		for rows.Next() {
-			var userName string
-			if err := rows.Scan(&userName); err != nil {
-				log.Err(err).Msg("扫描 Name2ID 行失败")
-				continue
-			}
-			talkerMap[userName] = i
-			i++
-		}
-		rows.Close()
 
 		// 保存数据库信息
 		infos = append(infos, MessageDBInfo{
@@ -206,10 +216,6 @@ func (ds *DataSource) initMessageDbs() error {
 		} else {
 			infos[i].EndTime = infos[i+1].StartTime
 		}
-	}
-	if len(ds.messageInfos) > 0 && len(infos) < len(ds.messageInfos) {
-		log.Warn().Msgf("message db count decreased from %d to %d, skip init", len(ds.messageInfos), len(infos))
-		return nil
 	}
 	ds.messageInfos = infos
 	return nil

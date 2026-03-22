@@ -93,7 +93,7 @@ func New(path string) (*DataSource, error) {
 	}
 
 	ds.dbm.AddCallback(Message, func(event fsnotify.Event) error {
-		if !event.Op.Has(fsnotify.Create) {
+		if event.Op&(fsnotify.Create|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) == 0 {
 			return nil
 		}
 		if err := ds.initMessageDbs(); err != nil {
@@ -135,8 +135,11 @@ func (ds *DataSource) initMessageDbs() error {
 		var startTime time.Time
 		var timestamp int64
 
-		row := db.QueryRow("SELECT timestamp FROM Timestamp LIMIT 1")
-		if err := row.Scan(&timestamp); err != nil {
+		err = dbm.RetryTransientSQLite(func() error {
+			row := db.QueryRow("SELECT timestamp FROM Timestamp LIMIT 1")
+			return row.Scan(&timestamp)
+		})
+		if err != nil {
 			log.Err(err).Msgf("获取数据库 %s 的时间戳失败", filePath)
 			continue
 		}
@@ -161,10 +164,6 @@ func (ds *DataSource) initMessageDbs() error {
 		} else {
 			infos[i].EndTime = infos[i+1].StartTime
 		}
-	}
-	if len(ds.messageInfos) > 0 && len(infos) < len(ds.messageInfos) {
-		log.Warn().Msgf("message db count decreased from %d to %d, skip init", len(ds.messageInfos), len(infos))
-		return nil
 	}
 	ds.messageInfos = infos
 	return nil
