@@ -88,7 +88,7 @@ func New(path string) (*DataSource, error) {
 	}
 
 	ds.dbm.AddCallback(Message, func(event fsnotify.Event) error {
-		if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) == 0 {
+		if event.Op&(fsnotify.Create|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) == 0 {
 			return nil
 		}
 		if err := ds.initMessageDbs(); err != nil {
@@ -97,7 +97,7 @@ func New(path string) (*DataSource, error) {
 		return nil
 	})
 	ds.dbm.AddCallback(ChatRoom, func(event fsnotify.Event) error {
-		if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) == 0 {
+		if event.Op&(fsnotify.Create|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) == 0 {
 			return nil
 		}
 		if err := ds.initChatRoomDb(); err != nil {
@@ -133,27 +133,32 @@ func (ds *DataSource) initMessageDbs() error {
 		}
 
 		// 获取所有表名
-		rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'Chat_%'")
+		err = dbm.RetryTransientSQLite(func() error {
+			rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'Chat_%'")
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+
+			for rows.Next() {
+				var tableName string
+				if err := rows.Scan(&tableName); err != nil {
+					return err
+				}
+
+				// 从表名中提取可能的talker信息
+				talkerMd5 := extractTalkerFromTableName(tableName)
+				if talkerMd5 == "" {
+					continue
+				}
+				talkerDBMap[talkerMd5] = filePath
+			}
+			return rows.Err()
+		})
 		if err != nil {
 			log.Err(err).Msgf("数据库 %s 中没有 Chat 表", filePath)
 			continue
 		}
-
-		for rows.Next() {
-			var tableName string
-			if err := rows.Scan(&tableName); err != nil {
-				log.Err(err).Msgf("数据库 %s 扫描表名失败", filePath)
-				continue
-			}
-
-			// 从表名中提取可能的talker信息
-			talkerMd5 := extractTalkerFromTableName(tableName)
-			if talkerMd5 == "" {
-				continue
-			}
-			talkerDBMap[talkerMd5] = filePath
-		}
-		rows.Close()
 	}
 	ds.talkerDBMap = talkerDBMap
 	return nil
@@ -169,23 +174,28 @@ func (ds *DataSource) initChatRoomDb() error {
 		return err
 	}
 
-	rows, err := db.Query("SELECT m_nsUsrName, IFNULL(nickname,\"\") FROM GroupMember")
+	user2DisplayName := make(map[string]string)
+	err = dbm.RetryTransientSQLite(func() error {
+		rows, err := db.Query("SELECT m_nsUsrName, IFNULL(nickname,\"\") FROM GroupMember")
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var user string
+			var nickName string
+			if err := rows.Scan(&user, &nickName); err != nil {
+				return err
+			}
+			user2DisplayName[user] = nickName
+		}
+		return rows.Err()
+	})
 	if err != nil {
 		log.Err(err).Msg("获取群聊成员失败")
 		return nil
 	}
-
-	user2DisplayName := make(map[string]string)
-	for rows.Next() {
-		var user string
-		var nickName string
-		if err := rows.Scan(&user, &nickName); err != nil {
-			log.Err(err).Msg("扫描表名失败")
-			continue
-		}
-		user2DisplayName[user] = nickName
-	}
-	rows.Close()
 	ds.user2DisplayName = user2DisplayName
 
 	return nil

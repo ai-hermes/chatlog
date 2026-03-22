@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	_ "github.com/mattn/go-sqlite3"
@@ -149,9 +150,7 @@ func (d *DBManager) OpenDB(path string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	if old != nil {
-		_ = old.Close()
-	}
+	d.closeLater(old)
 
 	d.mutex.Lock()
 	d.dbs[path] = &dbCache{
@@ -188,11 +187,20 @@ func (d *DBManager) Callback(event fsnotify.Event) error {
 	}
 	d.mutex.Unlock()
 
-	if old != nil {
-		_ = old.Close()
-	}
+	d.closeLater(old)
 
 	return nil
+}
+
+func (d *DBManager) closeLater(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	go func() {
+		// Let in-flight queries finish before closing stale pool.
+		time.Sleep(5 * time.Second)
+		_ = db.Close()
+	}()
 }
 
 func (d *DBManager) Start() error {
