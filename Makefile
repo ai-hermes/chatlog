@@ -56,7 +56,15 @@ crossbuild: clean
 		[ "$$float" != "" ] && output_name=$$output_name_$$float; \
 		echo "🔨 Building for $$os/$$arch..."; \
 		echo "🔨 Building for $$output_name..."; \
-		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 GOARM=$$float $(GO) build -trimpath $(LDFLAGS) -o $$output_name main.go; \
+		cc_env=""; cxx_env=""; \
+		if [ "$$os/$$arch" = "linux/arm64" ]; then \
+			cc_env="$${CC:-aarch64-linux-gnu-gcc}"; \
+			cxx_env="$${CXX:-aarch64-linux-gnu-g++}"; \
+			command -v "$$cc_env" >/dev/null 2>&1 || { echo "missing cross-compiler: $$cc_env (required for CGO linux/arm64)"; exit 1; }; \
+			command -v "$$cxx_env" >/dev/null 2>&1 || { echo "missing cross-compiler: $$cxx_env (required for CGO linux/arm64)"; exit 1; }; \
+			echo "⚙️ Using CC=$$cc_env CXX=$$cxx_env"; \
+		fi; \
+		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 GOARM=$$float CC=$$cc_env CXX=$$cxx_env $(GO) build -trimpath $(LDFLAGS) -o $$output_name main.go; \
 		if [ "$(ENABLE_UPX)" = "1" ] && echo "$(UPX_PLATFORMS)" | grep -q "$$os/$$arch"; then \
 			echo "⚙️ Compressing binary $$output_name..." && upx --best $$output_name; \
 		fi; \
@@ -78,7 +86,15 @@ crossbuild-wechat-mem0-core:
 			output_name=$${output_name}.exe; \
 		fi; \
 		echo "🔨 Building wechat-mem0-core for $$os/$$arch..."; \
-		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 $(GO) build -trimpath $(LDFLAGS) -o $$output_name cmd/wechat-mem0-core/main.go; \
+		cc_env=""; cxx_env=""; \
+		if [ "$$os/$$arch" = "linux/arm64" ]; then \
+			cc_env="$${CC:-aarch64-linux-gnu-gcc}"; \
+			cxx_env="$${CXX:-aarch64-linux-gnu-g++}"; \
+			command -v "$$cc_env" >/dev/null 2>&1 || { echo "missing cross-compiler: $$cc_env (required for CGO linux/arm64)"; exit 1; }; \
+			command -v "$$cxx_env" >/dev/null 2>&1 || { echo "missing cross-compiler: $$cxx_env (required for CGO linux/arm64)"; exit 1; }; \
+			echo "⚙️ Using CC=$$cc_env CXX=$$cxx_env"; \
+		fi; \
+		GOOS=$$os GOARCH=$$arch CGO_ENABLED=1 CC=$$cc_env CXX=$$cxx_env $(GO) build -trimpath $(LDFLAGS) -o $$output_name cmd/wechat-mem0-core/main.go; \
 	done
 
 

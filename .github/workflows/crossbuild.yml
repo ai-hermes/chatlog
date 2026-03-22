@@ -43,6 +43,13 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Install arm64 cross-compiler
+        if: matrix.goos == 'linux' && matrix.goarch == 'arm64'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
       - name: Cross build (Linux)
         shell: bash
         run: make crossbuild PLATFORMS="${{ matrix.goos }}/${{ matrix.goarch }}"
