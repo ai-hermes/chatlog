@@ -54,14 +54,11 @@ jobs:
         if: matrix.goos == 'linux' && matrix.goarch == 'arm64'
         shell: bash
         run: |
-          sudo dpkg --add-architecture arm64
           sudo apt-get update
           sudo apt-get install -y \
-            pkg-config \
             gcc-aarch64-linux-gnu \
             g++-aarch64-linux-gnu \
-            libc6-dev-arm64-cross \
-            libsqlite3-dev:arm64
+            libc6-dev-arm64-cross
 
       - name: Set version
         id: version
